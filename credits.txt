@@ -1,0 +1,4 @@
+Working Credits list
+Haider Tech - Face detection using webcam
+pysource.com - gaze detection
+@victorhoppenot - optimized eye detection to remove false positives 
