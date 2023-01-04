@@ -55,7 +55,7 @@ while True:
             y = int(y)
             """Uses dlib to mark all landmarks - IMPORTANT: Not changing with emotion?"""
             landmarks.append((x - bound[0],y - bound[1]))
-            cv2.circle(img, (x, y), 2, (255, 255, 0), -1)
+            cv2.circle(img, (x - bound[0], y), 2, (255, 255, 0), -1)
     
 
 
@@ -76,4 +76,3 @@ while True:
         print(f"Data points for {emotion} have been added to emotion.json!")
         break
     cv2.imshow("Webcam", img)
-    

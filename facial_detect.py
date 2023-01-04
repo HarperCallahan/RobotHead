@@ -1,8 +1,6 @@
 import cv2
 import dlib
-from fer import FER
 import numpy as np
-from imutils import face_utils
 import time
 import random
 import json
@@ -21,8 +19,11 @@ BLINK_TIME = 10
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(RES*DIM))
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(RES))
+cv2.namedWindow("Webcam")
 emo_screen = np.zeros((int(RES), int(RES*DIM),3), np.uint8)
 blinking = BLINK_TIME
+
+
 
 
 def rect_to_bb(rect):
@@ -95,22 +96,39 @@ def contouring(thresh, mid, img, blink, right=False):
         except:
             pass
 
-def emotion_register(list,x ,y):
+
+
+   
+#find dot that changes least (eg 1)
+#let dot be baseline dot for model
+#in emotion_register, set corrosponding dot to dot in one of the dicts
+#find the difference between the two dots, use difference on all dots
+#calculate as normal past that point
+def testing(dot):
+    cv2.circle(img, (shape[dot][0], shape[dot][1]), 4, (255,0,255), -1 )
+    print(dot)
+
+def emotion_register(list, x_base, y_base):
     with open('emotion.json', 'r') as openfile:
         json_emotion = json.load(openfile)
     
     visual = {} 
     for item in json_emotion:#issue is in here
-        json_emotion[item]= np.add(json_emotion[item], [x,y])
-        visual[item] = (np.mean(np.subtract(list, json_emotion[item])))
-        #print(item , "with a score of", np.subtract(list,json_emotion[item]))
+        absolute_change = (abs(x_base - json_emotion[item][0][0]), abs(y_base - json_emotion[item][0][1])) #works as intended: finds the integer amounts needed on x and y to pair up with the face
+
+        for data in json_emotion[item]:
+            data[0] += absolute_change[0]
+            data[1] += absolute_change[1]
+        visual[item] = json_emotion[item]
+
+        visual[item] = (np.absolute(np.mean(np.subtract(list, visual[item]))))
+        print(item , "with a score of", visual[item])
     #print(json_emotion)
     final =  min(visual, key=visual.get)
     print("the emotion is:", final)
 
     for item in json_emotion[final]:
-        print(item)
-        cv2.circle(img, (item[0], item[1]), 2, (255, 0, 255), -1) #temp 
+        cv2.circle(img, (item[0], item[1]), 2, (255, 0, 0), -1) #temp 
 
 
 def blink(time):
@@ -132,6 +150,8 @@ left = [36, 37, 38, 39, 40, 41]
 right = [42, 43, 44, 45, 46, 47]
 
 kernel = np.ones((9, 9), np.uint8)
+
+cv2.createTrackbar('dot', "Webcam", 0, 68, testing)
 while True:
     timer = time.time()
     
@@ -143,9 +163,9 @@ while True:
 
         shape = predictor(gray,face)
         rect_to_bb(face)
-        (x, y, w, h) = face_utils.rect_to_bb(face)
 
         #eye detection
+        
         shape = shape_to_np(shape)
         mask = np.zeros(img.shape[:2], dtype=np.uint8)
         mask = eye_on_mask(mask, left)
@@ -166,16 +186,15 @@ while True:
         blinking = blink(blinking)
         contouring(thresh[:, 0:mid], mid, img, blinking)
         contouring(thresh[:, mid:], mid, img, blinking, True )
-        cv2.rectangle(img, (x,y), (x+w, y+h), (0,255,0),2) #finds face and draws a rectangle'''
-            
-        cv2.circle(img, (x,y), 1 ,(255,255,255) , -1)
 
         facial_landmarks = []
+        testing(cv2.getTrackbarPos("dot", "Webcam"))
+        adjust_x, adjust_y = shape[0][0], shape[0][1]
         for (i, j) in shape[0:68]:
            facial_landmarks.append((i,j))
-           cv2.circle(img, (i, j), 2, (255, 255, 0), -1) #temp
+           cv2.circle(img, (i, j), 2, (0, 255, 0), -1) #temp
         
-        emotion_register(facial_landmarks, x + x//h, y + y//w )
+        emotion_register(facial_landmarks, adjust_x, adjust_y)
         
 
         
@@ -189,6 +208,7 @@ while True:
     cv2.imshow("Emotion Screen", emo_screen)
     #this is for bugfixing and seeing what the screen sees
     cv2.imshow("Webcam", img)
+
     0xff
     #print("The amount of time, in ms, to reach this frame is: " ,1000*(time.time()-timer)) 
     k = cv2.waitKey(1000//FPS)
